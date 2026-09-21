@@ -23,6 +23,10 @@
 | 模块阅读包       | `pnpm architecture:context <module-id>`   |
 | 未使用依赖与导出 | `pnpm knip`                               |
 | 导出引用查询     | `pnpm dep:refs --list-exports <file>`     |
+| 上游更新检查     | `pnpm upstream:check`                     |
+| 标记上游同步点   | `pnpm upstream:mark-synced`               |
+
+本仓库独立于官方 ZCode 演进：官方仓库挂 `upstream`（push 已禁用），跟进策略见 `UPSTREAM-SYNC.md`。
 
 测试入口以目标包当前的 `package.json` 和实际测试文件为准，不假定存在统一的单测或 E2E 命令。
 
@@ -34,6 +38,7 @@
 - `apps/zcode-cli`：Agent CLI 与运行时。
 - `CONTEXT.md`：插件商店领域词汇；修改相关 UI 前阅读。
 - `DESIGN.md`：UI 设计规范；修改 UI 前阅读。
+- `UPSTREAM-SYNC.md`：独立于官方 ZCode 的上游跟进策略；吸收上游提交前阅读。
 
 ## 实现与验证
 

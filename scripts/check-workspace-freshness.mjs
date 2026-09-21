@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 开工前基线新鲜度检查 —— 当前分支落后自己的远端、或（非特性分支时）落后
-// origin/main 超阈值，直接失败，防止在旧架构上分析、写测试、修已经消失的问题。
+// 主远端 main（origin，缺失时回退 upstream）超阈值，直接失败，防止在旧架构上分析、写测试、修已经消失的问题。
 //
 // 背景：本地 zcode-cua 曾落后 origin/main 140 个提交（本地 Skill 仍
 // 558 行、主线已收敛到 128 行），z-code 集成分支曾落后自己的远端 29 个提交，都曾在
@@ -32,8 +32,20 @@ async function git(...gitArgs) {
   return stdout.trim();
 }
 
-if (doFetch) {
-  await git("fetch", "origin", "--prune");
+// 主远端：本仓库独立于官方 ZCode 演进后，官方仓库挂在 upstream，自有仓库（若有）
+// 挂 origin。新鲜度基准优先用自有 origin；没有时回退 upstream，两种形态都能跑。
+const remotes = (await git("remote"))
+  .split("\n")
+  .map((r) => r.trim())
+  .filter(Boolean);
+const mainRemote = remotes.includes("origin")
+  ? "origin"
+  : remotes.includes("upstream")
+    ? "upstream"
+    : null;
+
+if (doFetch && mainRemote) {
+  await git("fetch", mainRemote, "--prune");
 }
 
 const branch = await git("rev-parse", "--abbrev-ref", "HEAD");
@@ -57,24 +69,29 @@ if (upstream) {
 }
 
 let mainReport = "";
-try {
-  await git("rev-parse", "--verify", "origin/main^{commit}");
-  const aheadMain = Number(await git("rev-list", "--count", `origin/main..HEAD`));
-  const behindMain = Number(await git("rev-list", "--count", `HEAD..origin/main`));
-  mainReport = `相对 origin/main：ahead ${aheadMain} / behind ${behindMain}（阈值 ${maxBehindMain}）`;
-  if (behindMain > maxBehindMain) {
-    const message = `落后 origin/main ${behindMain} 个提交，超过阈值 ${maxBehindMain}`;
-    if (aheadMain === 0) {
-      failures.push(`${message}：git merge --ff-only origin/main 或重建分支`);
-    } else {
-      console.warn(
-        `[freshness] 警告：${message}。这是特性/MR 分支（ahead ${aheadMain}），` +
-          `分叉本身正常；若要跟主线对齐请先确认 MR 状态（有未合并的草稿变更时不要盲目 rebase）。`,
-      );
+if (!mainRemote) {
+  console.warn("[freshness] 仓库没有配置任何远端，跳过 main 距离检查。");
+} else {
+  const mainRef = `${mainRemote}/main`;
+  try {
+    await git("rev-parse", "--verify", `${mainRef}^{commit}`);
+    const aheadMain = Number(await git("rev-list", "--count", `${mainRef}..HEAD`));
+    const behindMain = Number(await git("rev-list", "--count", `HEAD..${mainRef}`));
+    mainReport = `相对 ${mainRef}：ahead ${aheadMain} / behind ${behindMain}（阈值 ${maxBehindMain}）`;
+    if (behindMain > maxBehindMain) {
+      const message = `落后 ${mainRef} ${behindMain} 个提交，超过阈值 ${maxBehindMain}`;
+      if (aheadMain === 0) {
+        failures.push(`${message}：git merge --ff-only ${mainRef} 或重建分支`);
+      } else {
+        console.warn(
+          `[freshness] 警告：${message}。这是特性/MR 分支（ahead ${aheadMain}），` +
+            `分叉本身正常；若要跟主线对齐请先确认 MR 状态（有未合并的草稿变更时不要盲目 rebase）。`,
+        );
+      }
     }
+  } catch {
+    console.warn(`[freshness] 仓库没有 ${mainRef}，跳过 main 距离检查。`);
   }
-} catch {
-  console.warn("[freshness] 仓库没有 origin/main，跳过 main 距离检查。");
 }
 
 if (failures.length > 0) {
