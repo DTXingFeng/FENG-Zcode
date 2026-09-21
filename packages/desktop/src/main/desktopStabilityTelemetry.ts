@@ -39,7 +39,7 @@ const AGENT_CRASH_POSIX_ABSOLUTE_PATH_PATTERN =
   /\/(?:[^/\s"'`()[\]{}<>:]+\/)*[^/\s"'`()[\]{}<>:]+/g;
 const AGENT_CRASH_KNOWN_PATH_PLACEHOLDER_PATTERN = /<(?:workspace|home)>[^\s"'`()[\]{}<>]*/g;
 
-type StabilityLifecycleScene = "cold_start" | "runtime" | "app_quit" | "update_install";
+type StabilityLifecycleScene = "cold_start" | "runtime" | "app_quit";
 
 type StabilityWindowScene = "main" | "process_monitor" | "other";
 
@@ -579,7 +579,7 @@ export function reportAgentProcessExitToArms(
     });
     return;
   }
-  if (lifecycleScene === "app_quit" || lifecycleScene === "update_install") {
+  if (lifecycleScene === "app_quit") {
     // Bug 根因：Host 清理与 IPC 回传是异步的，perf_app_exit 之后仍可能晚到一个缺失
     // termination intent 的 Agent exit。应用退出是 main 持有的更高层事实，不能计入 runtime crash。
     logger.debug?.("[stability] late Agent exit suppressed during app shutdown", {
